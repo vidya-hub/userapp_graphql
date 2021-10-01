@@ -1,7 +1,14 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:graphql_flutter/graphql_flutter.dart';
 import 'package:userapp/components/signin/components.dart';
 import 'package:userapp/screens/signin.dart';
+import 'package:userapp/service/API/apiservice.dart';
+import 'package:userapp/service/AuthService.dart';
+import 'package:userapp/utils/shared_pref.dart';
 
 class RegistrationPage extends StatefulWidget {
   RegistrationPage({Key? key}) : super(key: key);
@@ -26,6 +33,41 @@ class _RegistrationPageState extends State<RegistrationPage> {
       _passwordVisible = false;
       _confirmPasswordVisible = false;
     });
+  }
+
+  void showToast(String msgs) {
+    Fluttertoast.showToast(
+        msg: msgs,
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        timeInSecForIosWeb: 1);
+  }
+
+  ApiService apiService = ApiService();
+
+  // bool passwordValidate(String value) {
+  //   String pattern =
+  //       r'^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[!@#\$&*~]).{8,}$';
+  //   RegExp regExp = new RegExp(pattern);
+  //   return regExp.hasMatch(value);
+  // }
+  bool passwordValidate(String password, [int minLength = 8]) {
+    if (password == null || password.isEmpty) {
+      return false;
+    }
+
+    bool hasUppercase = password.contains(new RegExp(r'[A-Z]'));
+    bool hasDigits = password.contains(new RegExp(r'[0-9]'));
+    bool hasLowercase = password.contains(new RegExp(r'[a-z]'));
+    bool hasSpecialCharacters =
+        password.contains(new RegExp(r'[!@#$%^&*(),.?":{}|<>]'));
+    bool hasMinLength = password.length > minLength;
+
+    return hasDigits &
+        hasUppercase &
+        hasLowercase &
+        hasSpecialCharacters &
+        hasMinLength;
   }
 
   @override
@@ -57,6 +99,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                 width: _pwidth * 0.8,
                 height: _pheight * 0.08,
                 child: TextField(
+                  controller: _passwordController,
                   textInputAction: TextInputAction.next,
                   keyboardType: TextInputType.visiblePassword,
                   obscureText: !_passwordVisible,
@@ -81,6 +124,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
                 width: _pwidth * 0.8,
                 height: _pheight * 0.08,
                 child: TextField(
+                  controller: _confirmPasswordController,
                   textInputAction: TextInputAction.next,
                   keyboardType: TextInputType.visiblePassword,
                   obscureText: !_confirmPasswordVisible,
@@ -105,7 +149,105 @@ class _RegistrationPageState extends State<RegistrationPage> {
               ),
               SizedBox(height: _pheight * 0.006),
               GestureDetector(
-                onTap: () {},
+                onTap: () async {
+                  if (_nameController.text == null ||
+                      _nameController.text == "") {
+                    showToast("Please enter Your Name.");
+                    return;
+                  }
+                  if (_contactController.text == null ||
+                      _contactController.text == "") {
+                    showToast("Please enter Phone number");
+                    return;
+                  } else if (((_contactController.text.toString().length <
+                      10))) {
+                    showToast("Please enter 10 digit Phone No.");
+                    return;
+                  }
+
+                  if (_emailController.text == null ||
+                      _emailController.text == "") {
+                    showToast("Please enter Email.");
+                    return;
+                  } else if (!emailValidation(_emailController.text)) {
+                    showToast("Please enter valid Email.");
+                    return;
+                  }
+
+                  if (_passwordController.text == null ||
+                      _passwordController.text == "") {
+                    showToast("Please enter Password.");
+                    return;
+                  }
+                  if (_passwordController.text.toString().length < 8) {
+                    showToast(
+                        "Please enter Password not less than 8 charecters.");
+                    return;
+                  }
+                  if (_confirmPasswordController.text == null ||
+                      _confirmPasswordController.text == "") {
+                    showToast("Please enter Confirm Password.");
+                    return;
+                  }
+                  if (_confirmPasswordController.text !=
+                      _passwordController.text) {
+                    showToast("Password and confirm Password must be same.");
+                    return;
+                  }
+
+                  // else if (!passwordValidate(
+                  //     _passwordController.text.trim())) {
+                  //   showToast("Please Enter valid Password.");
+                  //   showToast(
+                  //       "Password should contain at least One special character,One UpperCase,One Number and 8 characters in length");
+                  //   return;
+                  // }
+                  print("Done");
+                  /* Map<String, String> body = {
+                    "name": _nameController.text.trim(),
+                    "email": _emailController.text.trim(),
+                    "phone": _contactController.text.trim(),
+                    "password": _passwordController.text.trim(),
+                    "Referral_code_used": "active50"
+                  };
+                  var resPonse = await apiService.register(body);
+                  if (resPonse["is_active"] != null &&
+                      resPonse["is_active"] == true) {
+                    showToast("User Successfully Registered");
+                    showToast("Please Login With your Credentials");
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => LogInPage(),
+                        ));
+                  } else {
+                    showToast("User Email or PhoneNo already Registered");
+                  } */
+                  // print(resPonse["is_active"]);
+                  // print(resPonse);
+
+                  QueryResult response = await AuthService.createUser(
+                    _passwordController.text.trim(),
+                    _nameController.text.trim(),
+                    _emailController.text.trim(),
+                    _contactController.text.trim(),
+                  );
+                  var result = jsonDecode(jsonEncode(response.data));
+                  print(result);
+                  // print(jsonDecode(result));
+                  if (result["createUser"] != null) {
+                    result["createUser"]["success"] == true
+                        ? showToast("Successfully Registered")
+                        : showToast("User Not Successfully Registered");
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => LogInPage(),
+                        ));
+                  } else {
+                    showToast("User Not Successfully Registered");
+                  }
+                },
                 child: loginButton(_pwidth, _pheight),
               ),
               SizedBox(height: _pheight * 0.001),
@@ -119,7 +261,14 @@ class _RegistrationPageState extends State<RegistrationPage> {
               ),
               SizedBox(height: _pheight * 0.001),
               GestureDetector(
-                onTap: () {},
+                onTap: () async {
+                  await SharedPref.getUserData().then(
+                    (value) {
+                      print(value);
+                    },
+                  );
+                  // print();
+                },
                 child: googleButton(_pwidth, _pheight),
               ),
               SizedBox(height: _pheight * 0.001),
@@ -161,6 +310,18 @@ class _RegistrationPageState extends State<RegistrationPage> {
         ),
       ),
     );
+  }
+
+  bool emailValidation(String value) {
+    Pattern pattern =
+        r'^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$';
+    RegExp regex = RegExp(
+      pattern.toString(),
+    );
+    if (!regex.hasMatch(value))
+      return false;
+    else
+      return true;
   }
 
   Widget loginButton(double _pwidth, double _pheight) {
@@ -238,7 +399,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
       width: _pwidth * 0.8,
       height: _pheight * 0.08,
       child: TextField(
-        controller: _emailController,
+        controller: _nameController,
         textInputAction: TextInputAction.next,
         keyboardType: TextInputType.emailAddress,
         decoration: InputDecoration(
@@ -254,9 +415,9 @@ class _RegistrationPageState extends State<RegistrationPage> {
       width: _pwidth * 0.8,
       height: _pheight * 0.08,
       child: TextField(
-        controller: _emailController,
+        controller: _contactController,
         textInputAction: TextInputAction.next,
-        keyboardType: TextInputType.emailAddress,
+        keyboardType: TextInputType.phone,
         decoration: InputDecoration(
           labelText: "Contact No",
         ),

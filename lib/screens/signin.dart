@@ -1,7 +1,16 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:graphql_flutter/graphql_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:userapp/components/signin/components.dart';
 import 'package:userapp/screens/signUp.dart';
+import 'package:userapp/screens/welcomePage.dart';
+import 'package:userapp/service/API/apiservice.dart';
+import 'package:userapp/service/AuthService.dart';
+import 'package:userapp/utils/shared_pref.dart';
 
 class LogInPage extends StatefulWidget {
   const LogInPage({Key? key}) : super(key: key);
@@ -20,6 +29,28 @@ class _LogInPageState extends State<LogInPage> {
       _passwordVisible = false;
     });
   }
+
+  void showToast(String msgs) {
+    Fluttertoast.showToast(
+        msg: msgs,
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        timeInSecForIosWeb: 1);
+  }
+
+  bool emailValidation(String value) {
+    Pattern pattern =
+        r'^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$';
+    RegExp regex = RegExp(
+      pattern.toString(),
+    );
+    if (!regex.hasMatch(value))
+      return false;
+    else
+      return true;
+  }
+
+  ApiService apiService = ApiService();
 
   @override
   Widget build(BuildContext context) {
@@ -46,6 +77,7 @@ class _LogInPageState extends State<LogInPage> {
                 width: _pwidth * 0.8,
                 height: _pheight * 0.1,
                 child: TextField(
+                  controller: _passwordController,
                   textInputAction: TextInputAction.next,
                   keyboardType: TextInputType.visiblePassword,
                   obscureText: !_passwordVisible,
@@ -71,7 +103,66 @@ class _LogInPageState extends State<LogInPage> {
               forgotPassword(_pwidth),
               SizedBox(height: _pheight * 0.01),
               GestureDetector(
-                onTap: () {},
+                onTap: () async {
+                  if (_emailController.text == null ||
+                      _emailController.text == "") {
+                    showToast("Please enter Email.");
+                    return;
+                  } else if (!emailValidation(_emailController.text)) {
+                    showToast("Please enter valid Email.");
+                    return;
+                  }
+
+                  if (_passwordController.text == null ||
+                      _passwordController.text == "") {
+                    showToast("Please enter Password.");
+                    return;
+                  }
+                  if (_passwordController.text.toString().length < 8) {
+                    showToast(
+                        "Please enter Password not less than 8 charecters.");
+                    return;
+                  }
+                  print("Done");
+                  QueryResult response = await AuthService.getToken(
+                    _emailController.text.trim(),
+                    _passwordController.text.trim(),
+                  );
+                  var result = jsonDecode(jsonEncode(response.data));
+                  print(result);
+                  if (result["tokenAuth"] != null) {
+                    showToast("Login Successful");
+                    await SharedPref.saveUserData(result["tokenAuth"]["token"]);
+                    await SharedPref.getUserData().then(
+                      (value) => print(value),
+                    );
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => GamePage(),
+                        ));
+                  } else {
+                    showToast("Login failed");
+                  }
+                  /* Map<String, String> body = {
+                    "email": _emailController.text.trim(),
+                    "password": _passwordController.text.trim(),
+                  };
+                  var resPonse = await apiService.login(body);
+                  print(resPonse["jwt"]);
+                  if (resPonse["jwt"] != null) {
+                    showToast("User is successfully Signed-IN");
+                    // print(result["tokenAuth"]["token"]);
+                    await SharedPref.saveUserData(resPonse["jwt"]);
+                    await SharedPref.getUserData().then(
+                      (value) => print(value),
+                    );
+                  } else {
+                    showToast(
+                      resPonse["detail"],
+                    );
+                  } */
+                },
                 child: loginButton(_pwidth, _pheight),
               ),
               SizedBox(height: _pheight * 0.01),
@@ -85,11 +176,23 @@ class _LogInPageState extends State<LogInPage> {
               ),
               SizedBox(height: _pheight * 0.01),
               GestureDetector(
-                onTap: () {},
+                onTap: () async {
+                  final prefs = await SharedPreferences.getInstance();
+                  // setState(() async {
+                  await prefs.clear();
+                  await prefs.remove('userData');
+                },
                 child: googleButton(_pwidth, _pheight),
               ),
               SizedBox(height: _pheight * 0.01),
-              fbButton(_pwidth, _pheight),
+              GestureDetector(
+                onTap: () async {
+                  await SharedPref.getUserData().then(
+                    (value) => print(value),
+                  );
+                },
+                child: fbButton(_pwidth, _pheight),
+              ),
               SizedBox(height: _pheight * 0.01),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
